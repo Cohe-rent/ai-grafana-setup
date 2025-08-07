@@ -3,115 +3,134 @@
 This setup was AI-generated using OpenRouter and the meta-llama/llama-3-8b-instruct model.
 
 ```
-Here is the complete setup using Terraform and Docker to deploy Grafana:
-
-**main.tf**
-```
-terraform {
-  required_version = ">= 1.1.0"
-
-  required_providers {
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "2.19.0"
-    }
-  }
-}
-
-provider "docker" {
-  host = "unix:///var/run/docker.sock"
-}
-
-resource "docker_container" "grafana" {
-  name  = "grafana"
-  image = "grafana/grafana:8.3.5"
-  ports = ["3000:3000"]
-  volumes = [
-    "${path.module}/grafana-data:/var/lib/grafana"
-  ]
-  environment = [
-    "GF_SECURITY_ADMIN_USER=${var.admin_user}",
-    "GF_SECURITY_ADMIN_PASSWORD=${var.admin_password}"
-  ]
-  depends_on = [docker_volume.grafana_data]
-}
-
-resource "docker_volume" "grafana_data" {
-  name = "grafana-data"
-}
-```
-
-**variables.tf**
-```
-variable "admin_user" {
-  type = string
-  default = "admin"
-}
-
-variable "admin_password" {
-  type = string
-  default = "password"
-}
-```
-
-**outputs.tf**
-```
-output "grafana_url" {
-  value = "http://localhost:3000"
-}
-```
+Here is an example of production-grade infrastructure code to deploy Grafana using Docker Compose:
 
 **docker-compose.yml**
-```
+```yaml
 version: '3'
 
 services:
   grafana:
-    image: grafana/grafana:8.3.5
+    image: grafana/grafana:7.4.4
     ports:
       - "3000:3000"
-    volumes:
-      - grafana-data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=${ADMIN_USER}
-      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - GF_SERVER_HTTP_PORT=3000
+      - GF_SERVER_HOST=localhost
+    restart: always
+    depends_on:
+      - db
+    networks:
+      - app
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=grafana
+      - POSTGRES_PASSWORD=grafana
+      - POSTGRES_DB=grafana
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - app
 
 volumes:
-  grafana-data:
+  db-data:
+
+networks:
+  app:
+    driver: bridge
 ```
+**Explanation:**
 
-**README.md**
+* We define two services: `grafana` and `db`. `grafana` uses the official Grafana image and exposes port 3000.
+* The `db` service uses the official Postgres image and sets environment variables for the database. It also mounts a persistent volume at `/var/lib/postgresql/data` to store database data.
+* The `grafana` service depends on the `db` service, meaning that Grafana will only start once the database is up and running.
+* We use a bridge network (`app`) to allow communication between the services.
+* We set the `GF_SERVER_HTTP_PORT` and `GF_SERVER_HOST` environment variables to configure Grafana to listen on port 3000 and bind to `localhost`.
+
+Best practices:
+
+* We use a dedicated network (`app`) to isolate the services and prevent conflicts with other networks.
+* We use persistent volumes to store database data, ensuring that changes are persisted even if the container is restarted or deleted.
+* We use the `restart: always` option to ensure that the services are restarted if they exit or crash.
+
+Kubernetes configuration (optional):
+
+If you prefer to use Kubernetes, you can create a Deployment YAML file:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:7.4.4
+        ports:
+        - containerPort: 3000
+        environment:
+          - GF_SERVER_HTTP_PORT=3000
+          - GF_SERVER_HOST=localhost
+        volumeMounts:
+        - name: db-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: db-data
+        persistentVolumeClaim:
+          claimName: grafana-db-data
+  dependsOn:
+  - name: db
+    type: Service
+  networks:
+  - name: app
+    type: Ingress
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  selector:
+    app: db
+  ports:
+  - name: db
+    port: 5432
+  type: ClusterIP
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-db-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 ```
-# Grafana Setup using Terraform and Docker
+**Explanation:**
 
-This setup uses Terraform to provision infrastructure locally using the `kreuzwerker/docker` provider, and Docker to run Grafana as a container.
+* We define a Deployment named `grafana` with a single replica.
+* The Deployment template includes a single container with the same configuration as the Docker Compose file.
+* We use a Persistent Volume Claim named `grafana-db-data` to request storage for the database.
+* We define a Service named `db` to expose the database.
+* We define an Ingress resource to allow incoming traffic to the `grafana` service.
 
-**Prerequisites**
+Best practices:
 
-* Docker installed on your machine
-* Terraform installed on your machine
-
-**Instructions**
-
-1. Run `terraform init` to initialize the Terraform working directory.
-2. Run `terraform apply` to provision the infrastructure and start the Grafana container.
-3. Access Grafana at `http://localhost:3000` using the admin user and password specified in the `variables.tf` file.
-
-**Environment Variables**
-
-The `admin_user` and `admin_password` variables are set using environment variables. You can override these variables by setting environment variables before running `terraform apply`. For example:
-
-* `ADMIN_USER=your_admin_user terraform apply`
-* `ADMIN_PASSWORD=your_admin_password terraform apply`
-
-**Persistent Storage**
-
-The Grafana data is stored in a local volume named `grafana-data`. This ensures that the data is persisted even after the container is restarted or deleted.
-
-**Troubleshooting**
-
-* Check the Grafana container logs using `docker logs -f grafana`
-* Check the Terraform output for any errors or warnings
-* Check the Docker volume size and adjust as needed using `docker volume inspect grafana-data` and `docker volume prune`
-```
+* We use a Deployment to manage the lifecycle of the Grafana container.
+* We use a Persistent Volume Claim to request storage for the database.
+* We use a Service to expose the database to the `grafana` service.
+* We use an Ingress resource to allow incoming traffic to the `grafana` service.
 ```
