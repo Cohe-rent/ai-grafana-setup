@@ -6,82 +6,104 @@ This setup was AI-generated using OpenRouter and the meta-llama/llama-3-8b-instr
 Here is the complete setup using Terraform and Docker to deploy Grafana:
 
 **main.tf**
-```
-provider "kreuzwerker/docker" {
-  docker_bin = "/usr/local/bin/docker"
+```terraform
+# Configure the Docker provider
+provider "docker" {}
+
+# Create a Docker network
+resource "docker_network" "grafana_network" {
+  name = "grafana-network"
 }
 
-resource "docker_container" "grafana" {
-  name  = "grafana"
-  image = "grafana/grafana:latest"
-  ports = ["3000:3000"]
-  volumes = [
-    "${path.module}/grafana-data:/var/lib/grafana"
-  ]
-  env = [
-    "GF_SERVER_ADMIN_USER=${var.admin_username}",
-    "GF_SERVER_ADMIN_PASSWORD=${var.admin_password}"
-  ]
-}
-
-resource "docker_volume" "grafana_data" {
+# Create a Docker volume for persistent storage
+resource "docker_volume" "grafana_volume" {
   name = "grafana-data"
 }
+
+# Create a Docker container for Grafana
+resource "docker_container" "grafana" {
+  name  = "grafana"
+  image = "grafana/grafana"
+  ports = ["3000:3000"]
+  volumes {
+    volume_name = docker_volume.grafana_volume.name
+  }
+  env = [
+    "GF_SECURITY_ADMIN_PASSWORD=${var.admin_password}",
+    "GF_SECURITY_ADMIN_USER=${var.admin_user}",
+  ]
+  networks_advanced {
+    attachment_config {
+      alias = "grafana_network"
+      alias = "grafana-network"
+    }
+  }
+}
 ```
+
 **variables.tf**
-```
-variable "admin_username" {
-  type = string
-  default = "admin"
+```terraform
+variable "admin_password" {
+  type        = string
+  description = "Grafana admin password"
 }
 
-variable "admin_password" {
-  type = string
-  default = "admin"
+variable "admin_user" {
+  type        = string
+  description = "Grafana admin username"
 }
 ```
+
 **outputs.tf**
-```
+```terraform
 output "grafana_url" {
   value = "http://localhost:3000"
 }
 ```
-**docker-compose.yml** (optional)
-```
+
+**docker-compose.yml**
+```yml
 version: '3'
 
 services:
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana
     ports:
       - "3000:3000"
     volumes:
-      - grafana-data:/var/lib/grafana
+      - ./grafana-data:/var/lib/grafana
     environment:
-      - GF_SERVER_ADMIN_USER=${admin_username}
-      - GF_SERVER_ADMIN_PASSWORD=${admin_password}
-
-volumes:
-  grafana-data:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
 ```
+
 **README.md**
-```
-# Grafana Setup
+```markdown
+# Grafana Deployment with Terraform and Docker
 
-This setup uses Terraform and Docker to deploy Grafana locally. It provisions a Docker container and exposes it on port 3000. The container uses a persistent volume for storage and sets the admin user and password through environment variables.
+## Prerequisites
 
-## Usage
+* Terraform installed (version 0.14 or higher)
+* Docker installed (version 20.10 or higher)
+* Docker Compose installed (optional)
 
-1. Clone this repository and navigate to the directory.
+## Configuration
+
+1. Set the `admin_password` and `admin_user` variables in `variables.tf` to your desired values.
 2. Run `terraform init` to initialize the Terraform working directory.
-3. Run `terraform apply` to provision the infrastructure and start the Grafana container.
-4. Access Grafana at <http://localhost:3000> and log in with the admin user and password set in the `variables.tf` file.
+3. Run `terraform apply` to provision the infrastructure.
+4. Once the deployment is complete, you can access Grafana at `http://localhost:3000`.
 
-Note: You can modify the `variables.tf` file to change the admin user and password.
+## Using Docker Compose (optional)
 
-## Docker Compose
+If you prefer to use Docker Compose, simply run `docker-compose up` in the current directory to deploy Grafana.
 
-If you prefer to use Docker Compose instead of Terraform, you can use the `docker-compose.yml` file instead. Run `docker-compose up -d` to start the container in detached mode.
+## Persistent Storage
+
+The Grafana data will be stored in a local Docker volume named `grafana-data`. This ensures that the data persists even after the container is deleted or recreated.
+
+## Environment Variables
+
+The `admin_password` and `admin_user` variables are set as environment variables in the container. You can override these values by setting the `GRAFANA_ADMIN_PASSWORD` and `GRAFANA_ADMIN_USER` environment variables before running the Terraform deployment.
 ```
-**Note:** Make sure to update the `docker_bin` path in the `provider "kreuzwerker/docker"` block to the correct path on your system.
 ```
