@@ -148,3 +148,34 @@ The Grafana data is stored in a local volume named `grafana-data`. This ensures 
 * Check the Grafana container logs using `docker logs -f grafana`
 * Check the Terraform output for any errors or warnings
 * Check the Docker volume size and adjust as needed using `docker volume inspect grafana-data` and `docker volume prune`
+**Explanation:**
+
+* We define two services: `grafana` and `db`. `grafana` uses the official Grafana image and exposes port 3000.
+* The `db` service uses the official Postgres image and sets environment variables for the database. It also mounts a persistent volume at `/var/lib/postgresql/data` to store database data.
+* The `grafana` service depends on the `db` service, meaning that Grafana will only start once the database is up and running.
+* We use a bridge network (`app`) to allow communication between the services.
+* We set the `GF_SERVER_HTTP_PORT` and `GF_SERVER_HOST` environment variables to configure Grafana to listen on port 3000 and bind to `localhost`.
+
+Best practices:
+
+* We use a dedicated network (`app`) to isolate the services and prevent conflicts with other networks.
+* We use persistent volumes to store database data, ensuring that changes are persisted even if the container is restarted or deleted.
+* We use the `restart: always` option to ensure that the services are restarted if they exit or crash.
+
+Kubernetes configuration (optional):
+
+If you prefer to use Kubernetes, you can create a Deployment YAML file:
+**Explanation:**
+
+* We define a Deployment named `grafana` with a single replica.
+* The Deployment template includes a single container with the same configuration as the Docker Compose file.
+* We use a Persistent Volume Claim named `grafana-db-data` to request storage for the database.
+* We define a Service named `db` to expose the database.
+* We define an Ingress resource to allow incoming traffic to the `grafana` service.
+
+Best practices:
+
+* We use a Deployment to manage the lifecycle of the Grafana container.
+* We use a Persistent Volume Claim to request storage for the database.
+* We use a Service to expose the database to the `grafana` service.
+* We use an Ingress resource to allow incoming traffic to the `grafana` service.
