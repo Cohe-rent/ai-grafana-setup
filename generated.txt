@@ -1,4 +1,4 @@
-Here is a minimal and production-ready Docker Compose configuration to run Grafana on port 3000 with persistent volume support and default admin credentials as environment variables:
+Here is a minimal and production-ready Docker Compose configuration to run Grafana on port 3000 with persistent volume support and default admin credentials:
 ```
 version: '3'
 
@@ -8,28 +8,28 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USERNAME}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_EXTERNAL_URL=http://grafana:3000
+      - GF_SERVER_ADMIN_USER=admin
+      - GF_SERVER_ADMIN_PASSWORD=change-me
     volumes:
       - grafana-data:/var/lib/grafana
-    restart: always
 
 volumes:
   grafana-data:
     driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/grafana-data
+      o: bind
 ```
-Let me explain what each part of the configuration does:
+Let me explain what each part does:
 
-* `version: '3'`: specifies the Docker Compose version.
-* `services`: defines the services to be run.
-* `grafana`: defines the Grafana service.
-	+ `image: grafana/grafana:latest`: uses the latest stable Grafana image.
-	+ `ports`: maps port 3000 on the host machine to port 3000 in the container.
-	+ `environment`: sets environment variables for the Grafana service.
-		- `GF_SECURITY_ADMIN_USER` and `GF_SECURITY_ADMIN_PASSWORD`: set the default admin credentials.
-	+ `volumes`: mounts a persistent volume at `/var/lib/grafana` in the container.
-	+ `restart: always`: ensures the service is restarted if it exits or crashes.
-* `volumes`: defines the persistent volume.
-	+ `grafana-data`: uses the `local` driver to store the volume on the host machine.
+* `version`: specifies the Docker Compose version.
+* `services`: defines the services to run.
+* `grafana`: specifies the service name and image to use (latest stable Grafana image).
+* `ports`: maps port 3000 on the host machine to port 3000 in the container.
+* `environment`: sets environment variables for the Grafana service. These variables configure the admin user and password, and the external URL.
+* `volumes`: specifies the persistent volume to use for storing Grafana data.
+* `grafana-data`: defines the name of the volume, and uses the `local` driver to store the data in a directory named `grafana-data` in the current working directory. The `driver_opts` section specifies the mount options.
 
-To use this configuration, create a file named `docker-compose.yml` with the above content, and then run `docker-compose up -d` to start the service in detached mode. You can then access Grafana at `http://localhost:3000` with the default admin credentials set in the environment variables.
+To use this configuration, create a new file named `docker-compose.yml` and copy the contents above into it. Then, run `docker-compose up` to start the Grafana service, and access it at `http://localhost:3000`.
